@@ -1,0 +1,9 @@
+services:
+  cup-notifier:
+    image: ghcr.io/airopi/cup-notifier
+    environment:
+      CUP_URL: ${CUP_URL}
+      NOTIFICATION_URLS: ${NOTIFICATION_URLS}
+      INSECURE_SKIP_VERIFY: ${INSECURE_SKIP_VERIFY:-false}
+    restart: always
+

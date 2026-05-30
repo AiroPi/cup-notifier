@@ -1,0 +1,8 @@
+services:
+  cup-notifier:
+    build: .
+    environment:
+      NOTIFICATION_URLS: ${NOTIFICATION_URLS}
+      CUP_URL: ${CUP_URL}
+      INSECURE_SKIP_VERIFY: true
+
