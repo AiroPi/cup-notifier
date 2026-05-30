@@ -8,6 +8,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /cup-notifier
 
 FROM scratch
 
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /cup-notifier /cup-notifier
 CMD ["/cup-notifier"]
 
