@@ -104,7 +104,7 @@ func checkForUpdates(notifier *apprise.Apprise) {
 			apprise.WithTitle(title),
 			apprise.WithNotifyType(apprise.NotifyInfo),
 		); err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 	}
 }
