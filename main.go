@@ -1,38 +1,49 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
-	"io"
-	"encoding/json"
-	"strings"
-	"log"
 	"crypto/tls"
-	"time"
-	"os"
+	"encoding/json"
+	"fmt"
 	apprise "github.com/unraid/apprise-go"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+	"time"
 )
 
 var cache = make(map[string]map[string]any)
 
-func checkForUpdates(notifier *apprise.Apprise) {
+func checkForUpdates(notifier *apprise.Apprise) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("unable to parse cup response: %v", r)
+		}
+	}()
+
 	if os.Getenv("INSECURE_SKIP_VERIFY") == "true" {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 	baseUrl, _ := strings.CutSuffix(os.Getenv("CUP_URL"), "/")
 	resp, err := http.Get(baseUrl + "/api/v3/json")
 	if err != nil {
-		log.Fatalln(err)
+		return fmt.Errorf("unable to get cup data: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected cup status code: %d", resp.StatusCode)
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
+		return fmt.Errorf("unable to read cup response: %w", err)
 	}
 	var dat map[string]any
 	err = json.Unmarshal(body, &dat)
 	if err != nil {
-		log.Fatalln(err)
+		return fmt.Errorf("unable to decode cup response: %w", err)
 	}
 
 	newCache := make(map[string]map[string]any)
@@ -75,9 +86,9 @@ func checkForUpdates(notifier *apprise.Apprise) {
 				newVersion := info["new_version"].(string)
 
 				hosts[server] = map[string]string{
-					"type": "version", 
-					"current": info["current_version"].(string), 
-					"new": newVersion,
+					"type":    "version",
+					"current": info["current_version"].(string),
+					"new":     newVersion,
 				}
 
 				if oldHosts == nil || oldHosts[server] == nil || oldHosts[server]["new"] != newVersion {
@@ -107,28 +118,32 @@ func checkForUpdates(notifier *apprise.Apprise) {
 			log.Println(err)
 		}
 	}
+
+	return nil
 }
 
 func main() {
-	for {
-		notifier := apprise.New()
-		endpoints := os.Getenv("NOTIFICATION_URLS")
-		if endpoints != "" {
-			for _, url := range(strings.Split(endpoints, ",")) {
-				if err := notifier.Add(url); err != nil {
-					log.Fatal(err)
-				}
+	notifier := apprise.New()
+	endpoints := os.Getenv("NOTIFICATION_URLS")
+	if endpoints != "" {
+		for _, url := range strings.Split(endpoints, ",") {
+			if err := notifier.Add(url); err != nil {
+				log.Fatal(err)
 			}
-		} else {
-			log.Fatal("NOTIFICATION_URLS not defined")
 		}
+	} else {
+		log.Fatal("NOTIFICATION_URLS not defined")
+	}
 
-		if os.Getenv("CUP_URL") == "" {
-			log.Fatal("CUP_URL not defined")
-		}
+	if os.Getenv("CUP_URL") == "" {
+		log.Fatal("CUP_URL not defined")
+	}
 
+	for {
 		fmt.Println("Checking updates...")
-		checkForUpdates(notifier)
+		if err := checkForUpdates(notifier); err != nil {
+			log.Println(err)
+		}
 		time.Sleep(5 * time.Minute)
 	}
 }
