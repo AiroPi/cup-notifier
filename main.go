@@ -15,7 +15,7 @@ import (
 
 var cache = make(map[string]map[string]any)
 
-func checkForUpdates(notifier *apprise.Apprise) {
+func checkForUpdates(notifier *apprise.Apprise) (err error) {
 	if os.Getenv("INSECURE_SKIP_VERIFY") == "true" {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
