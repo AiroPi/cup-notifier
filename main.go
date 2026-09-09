@@ -102,7 +102,6 @@ func checkForUpdates(notifier *apprise.Apprise) (err error) {
 				}
 			}
 		}
-		return err
 	}
 
 	cache = newCache
@@ -135,7 +134,7 @@ func checkForUpdates(notifier *apprise.Apprise) (err error) {
 		}
 	}
 
-	return nil
+	return err
 }
 
 func main() {
