@@ -72,7 +72,7 @@ func checkForUpdates(notifier *apprise.Apprise) (err error) {
 			// image can be present multiple time (multi-host) so we initialize the cache only once.
 			if _, exists := newCache[key]; !exists {
 				newCache[key] = make(map[string]any)
-				newCache[key]["url"] = img["url"].(string)
+				newCache[key]["url"], _ = img["url"].(string)
 				newCache[key]["hosts"] = make(map[string]map[string]string)
 			}
 
