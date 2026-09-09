@@ -4,13 +4,14 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	apprise "github.com/unraid/apprise-go"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	apprise "github.com/unraid/apprise-go"
 )
 
 var cache = make(map[string]map[string]any)
@@ -19,12 +20,16 @@ func checkForUpdates(notifier *apprise.Apprise) (err error) {
 	if os.Getenv("INSECURE_SKIP_VERIFY") == "true" {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
-	baseUrl, _ := strings.CutSuffix(os.Getenv("CUP_URL"), "/")
-	resp, err := http.Get(baseUrl + "/api/v3/json")
+	baseURL, _ := strings.CutSuffix(os.Getenv("CUP_URL"), "/")
+	resp, err := http.Get(baseURL + "/api/v3/json")
 	if err != nil {
 		return fmt.Errorf("unable to get cup data: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected cup status code: %d", resp.StatusCode)
@@ -58,7 +63,7 @@ func checkForUpdates(notifier *apprise.Apprise) (err error) {
 			info := result["info"].(map[string]any)
 
 			key := parts["registry"].(string) + "/" + parts["repository"].(string)
-			info_type := info["type"].(string)
+			infoType := info["type"].(string)
 
 			if _, exists := newCache[key]; !exists {
 				newCache[key] = make(map[string]any)
@@ -71,12 +76,13 @@ func checkForUpdates(notifier *apprise.Apprise) (err error) {
 				oldHosts = oldImage["hosts"].(map[string]map[string]string)
 			}
 
-			if info_type == "digest" {
+			switch infoType {
+			case "digest":
 				hosts[server] = map[string]string{"type": "digest"}
 				if oldHosts == nil || oldHosts[server] == nil {
 					alerts[key] = append(alerts[key], server)
 				}
-			} else if info_type == "version" {
+			case "version":
 				newVersion := info["new_version"].(string)
 
 				hosts[server] = map[string]string{
@@ -90,6 +96,7 @@ func checkForUpdates(notifier *apprise.Apprise) (err error) {
 				}
 			}
 		}
+		return err
 	}
 
 	cache = newCache
@@ -120,7 +127,7 @@ func main() {
 	notifier := apprise.New()
 	endpoints := os.Getenv("NOTIFICATION_URLS")
 	if endpoints != "" {
-		for _, url := range strings.Split(endpoints, ",") {
+		for url := range strings.SplitSeq(endpoints, ",") {
 			if err := notifier.Add(url); err != nil {
 				log.Fatal(err)
 			}
