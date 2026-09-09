@@ -47,10 +47,14 @@ func checkForUpdates(notifier *apprise.Apprise) (err error) {
 
 	newCache := make(map[string]map[string]any)
 	alerts := make(map[string][]string)
+
+	// we map all images (from cup API)
 	for _, image := range dat["images"].([]any) {
 		img := image.(map[string]any)
 		parts := img["parts"].(map[string]any)
 		result := img["result"].(map[string]any)
+
+		// hardcoded special case for multi-host cup : the "server" key is null for the server which got the request.
 		server := "bluewhale"
 		if s, ok := img["server"].(string); ok {
 			server = s
@@ -65,8 +69,10 @@ func checkForUpdates(notifier *apprise.Apprise) (err error) {
 			key := parts["registry"].(string) + "/" + parts["repository"].(string)
 			infoType := info["type"].(string)
 
+			// image can be present multiple time (multi-host) so we initialize the cache only once.
 			if _, exists := newCache[key]; !exists {
 				newCache[key] = make(map[string]any)
+				newCache[key]["url"] = img["url"].(string)
 				newCache[key]["hosts"] = make(map[string]map[string]string)
 			}
 
@@ -101,12 +107,21 @@ func checkForUpdates(notifier *apprise.Apprise) (err error) {
 
 	cache = newCache
 	for k, v := range alerts {
-		title := fmt.Sprintf("New updates for %v", k)
+		var title string
+		if cache[k]["url"] == nil {
+			title = fmt.Sprintf("**New updates for `%v`:**", k)
+		} else {
+			title = fmt.Sprintf("**New updates for [`%v`](%v):**", k, cache[k]["url"])
+		}
 		var content []string
 
 		for _, h := range v {
 			infos := cache[k]["hosts"].(map[string]map[string]string)[h]
-			content = append(content, fmt.Sprintf(" - %v (%v -> %v)\n", h, infos["current"], infos["new"]))
+			if infos["current"] != "" {
+				content = append(content, fmt.Sprintf(" - *%v* (`%v` → `%v`)", h, infos["current"], infos["new"]))
+			} else {
+				content = append(content, fmt.Sprintf(" - *%v* (digest change)", h))
+			}
 		}
 
 		fmt.Println(title)
