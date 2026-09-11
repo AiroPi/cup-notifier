@@ -25,7 +25,7 @@ You can reach me over Discord at `@airo.pi`. Feel free to open an issue if you e
 
 ## How to contribute
 
-I would ❤️ to see your contribution! Simply open a pull request 
+I would ❤️ to see your contribution! Simply open a pull request.
 
 ## License
 
